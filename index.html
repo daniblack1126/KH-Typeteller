@@ -4,15 +4,14 @@
   <meta charset="utf-8" />
   <title>KeraNova Hair – TypeTeller</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <!-- Basic, brandable styles (edit colors/fonts to match your brand) -->
   <style>
     :root { --bg:#fff; --text:#111; --brand:#1f6feb; --muted:#f4f6f8; }
     body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; color:var(--text); background:var(--bg); }
     .wrap { max-width: 960px; margin: 0 auto; padding: 24px; }
-    header { display:flex; align-items:center; gap:12px; margin-bottom: 16px; }
+    header { display:flex; align-items:center; gap:12px; margin-bottom: 16px; flex-wrap:wrap; }
     header img { height: 32px; }
-    h1 { margin: 0; font-size: 20px; }
-    .card { background: var(--muted); border-radius: 12px; padding: 16px; }
+    h1 { margin: 0; font-size: 20px; width: 100%; } /* Force title on new line */
+    .card { background: var(--muted); border-radius: 12px; padding: 16px; position: relative; }
     .row { display:grid; grid-template-columns: 1fr; gap:16px; }
     @media(min-width:960px){ .row{ grid-template-columns: 1.1fr 1fr; } }
     button { background:var(--brand); color:#fff; border:0; padding:12px 16px; border-radius:10px; font-weight:600; cursor:pointer; }
@@ -24,22 +23,28 @@
     .divider { height:1px; background:#e6e9ec; margin:16px 0; }
     .badge { display:inline-block; background:#eef3ff; color:#1b3d8f; padding:3px 8px; border-radius:999px; font-size:12px; }
     .consent { display:flex; gap:12px; align-items:flex-start; margin:8px 0; }
+    /* Enlarged typeform */
+    #tf-form { min-height: 500px; }  
+    /* Close button */
+    .close-btn {
+      position: absolute; top: 8px; right: 12px;
+      background: transparent; border: none; font-size: 20px;
+      cursor: pointer; color: #555;
+    }
+    .close-btn:hover { color: #000; }
   </style>
-  <!-- Typeform embed runtime -->
   <script src="https://embed.typeform.com/next/embed.js" defer></script>
 </head>
 <body>
   <div class="wrap">
     <header>
-      <!-- Swap for your logo -->
       <img src="https://dummyimage.com/160x40/000/fff&text=KeraNova" alt="KeraNova">
-      <h1>Hair Type Classifier</h1>
+      <h1>Hair Type Teller</h1>
     </header>
 
     <p class="muted">Upload a clear hair photo. We’ll show the top hair type and confidence, then you can leave your email.</p>
 
     <div class="row">
-      <!-- Left: upload + consent + result -->
       <div class="card">
         <label><strong>1) Upload photo (JPEG/PNG)</strong></label><br/>
         <input id="file" type="file" accept="image/jpeg,image/png" />
@@ -69,42 +74,37 @@
       </div>
 
       <!-- Right: Typeform -->
-      <div class="card">
+      <div class="card" id="typeform-card">
+        <button class="close-btn" id="closeTypeform">&times;</button>
         <label><strong>Leave your email (optional)</strong></label>
         <div id="tf-form"></div>
       </div>
     </div>
   </div>
 
-  <!-- Gradio client (browser ESM via jsDelivr) -->
   <script type="module">
     import { client } from "https://cdn.jsdelivr.net/npm/@gradio/client/+esm";
 
-    // ===== CONFIG YOU MAY EDIT =====
-    const SPACE_ID = "daniblack1/Hair-Trainer-2025";     // your HF Space
-    const TYPEFORM_ID = "01K4T4CR7PWM5WCCH8KKPW1K5F";    // your form
+    const SPACE_ID = "daniblack1/Hair-Trainer-2025"; 
+    const TYPEFORM_ID = "01K4T4CR7PWM5WCCH8KKPW1K5F"; 
     const DESCRIPTIONS = {
       "Type 1: Straight": "Smooth strands with minimal bend; can look shiny and may resist curls. Use lightweight wash/conditioner and a weightless volumizer.",
       "Type 2: Wavy":     "Loose S-shaped pattern; can frizz or fall flat if products are heavy. Use light mousse or texturizing spray.",
       "Type 3: Curly":    "Defined, springy curls and volume; frizz-prone. Use moisture-rich wash, curl cream + gel; leave-in helps.",
       "Type 4: Kinky":    "Tight coils/zig-zags; very delicate and dry by nature. Use rich creams/butters and oils; coil-defining styler."
     };
-    // ===============================
 
-    // Basic UI handles
     const $ = (q)=>document.querySelector(q);
     const fileEl = $("#file"), analyzeBtn = $("#analyze"), statusEl = $("#status");
     const outBox = $("#out"), labelText = $("#labelText"), descText = $("#descText"), confBadge = $("#confBadge");
     const c13 = $("#c13"), cstore = $("#cstore");
 
-    // Enable button only when both a file and age consent exist
     function updateButton() {
       analyzeBtn.disabled = !(fileEl.files?.length && c13.checked);
     }
     fileEl.addEventListener("change", updateButton);
     c13.addEventListener("change", updateButton);
 
-    // Read UTM params once (for analytics + Typeform hidden)
     const urlParams = new URLSearchParams(location.search);
     const UTM = {
       utm_source:  urlParams.get("utm_source")  || "",
@@ -112,35 +112,32 @@
       utm_campaign:urlParams.get("utm_campaign")|| ""
     };
 
-    // Render Typeform with hidden fields (can be called multiple times)
     function renderTypeform(hairType="", confidence="", consent="") {
       const container = document.getElementById("tf-form");
-      container.innerHTML = ""; // reset
+      container.innerHTML = "";
       window.tf?.createWidget(TYPEFORM_ID, {
         container,
         hidden: { hairType, confidence, consent, ...UTM },
         opacity: 100, lazy: false
       });
     }
-    // Initial (blank) form
     window.addEventListener("load", () => renderTypeform());
 
-    // Call HF Space on click
+    // Close button for typeform
+    document.getElementById("closeTypeform").addEventListener("click", () => {
+      document.getElementById("typeform-card").style.display = "none";
+    });
+
     analyzeBtn.addEventListener("click", async () => {
       try {
         statusEl.textContent = "Uploading…";
         const file = fileEl.files?.[0];
         if (!file) { alert("Select a JPEG/PNG first."); return; }
 
-        // Build client and inspect the first API
         const c = await client(SPACE_ID);
-        // console.log(await c.view_api()); // uncomment to inspect the API
         statusEl.textContent = "Analyzing…";
-
-        // Most Spaces expose a single predict fn at index 0. We pass the File directly.
         const res = await c.predict(0, [file]);
 
-        // Handle Label output (either {label, confidences:[{label,confidence}..]} or a dict)
         let label = "", conf = 0;
         const out = res.data?.[0];
         if (out && typeof out === "object" && "label" in out) {
@@ -153,7 +150,6 @@
           throw new Error("Unexpected model output.");
         }
 
-        // Update UI
         const pct = Math.round(conf * 100);
         labelText.textContent = `${label} — ${pct}%`;
         descText.textContent  = DESCRIPTIONS[label] || "";
@@ -161,7 +157,6 @@
         outBox.classList.remove("hidden");
         statusEl.textContent = "Done.";
 
-        // Re-render Typeform with hidden values
         const consent = cstore.checked ? "store_ok" : "no_store";
         renderTypeform(label, String(pct), consent);
 
