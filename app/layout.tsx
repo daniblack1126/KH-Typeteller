@@ -1,6 +1,9 @@
+// app/layout.tsx
+import "./globals.css";
+
 export const metadata = {
   title: "KeraNova Hair – TypeTeller",
-  description: "Upload a hair photo to get a hair type prediction.",
+  description: "Upload a hair photo to see your hair type.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
