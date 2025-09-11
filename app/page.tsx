@@ -220,7 +220,7 @@ export default function Page() {
                 View policy
               </summary>
               <div style={{ marginTop: 8, maxHeight: 280, overflow: "auto", border: "1px solid #e6e9ec", padding: 12, borderRadius: 8, background: "#fafbfc" }}>
-                <p><em>Summary:</em> We collect your uploaded photo, the model’s hair-type prediction and confidence, your consent choices (13+ / store photo), optional contact details, basic device/usage data, and UTM parameters. We do not sell personal information or share it for cross-context behavioral advertising. Photos are processed transiently and not stored unless you opt in; stored photos are kept until you request deletion. Contact: danielle@keranovahair.com.</p>
+                <p>We collect uploaded photo, the model’s hair-type prediction and confidence, your consent choices (13+ / store photo), optional contact details, basic device/usage data, and UTM parameters. We do not sell personal information or share it for cross-context behavioral advertising. Photos are processed transiently and not stored unless you opt in; stored photos are kept until you request deletion. Contact: privacy@keranovahair.com.</p>
               </div>
             </details>
           </div>
