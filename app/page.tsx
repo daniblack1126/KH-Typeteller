@@ -2,12 +2,9 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Script from "next/script";
-import { client as gradioClient, type Client } from "@gradio/client";
 
 declare global {
-  interface Window {
-    tf?: any;
-  }
+  interface Window { tf?: any; }
 }
 
 const SPACE_ID = process.env.NEXT_PUBLIC_SPACE_ID || "daniblack1/Hair-Trainer-2025";
@@ -21,15 +18,19 @@ const DESCRIPTIONS: Record<string, string> = {
   "Type 4: Kinky":    "Tight coils/zig-zags; very delicate and dry by nature. Use rich creams/butters and oils; coil-defining styler."
 };
 
+// ---- Load Gradio client at runtime from CDN (avoids webpack bundling issues)
+async function loadGradioClient(): Promise<(space: string) => Promise<any>> {
+  const mod: any = await import("https://cdn.jsdelivr.net/npm/@gradio/client/+esm");
+  return mod.client;
+}
+
 function parseGradioOutput(out: any): { label: string; conf: number } {
-  // A) Label object { label, confidences: [{label, confidence}] }
   if (out && typeof out === "object" && "label" in out && Array.isArray(out.confidences)) {
     const label = out.label as string;
     const m = out.confidences.find((x: any) => x.label === label);
     const conf = m ? Number(m.confidence) : 0;
     return { label, conf };
   }
-  // B) Mapping dict { "Type 1: Straight": 0.87, ... }
   if (out && typeof out === "object" && !Array.isArray(out)) {
     const entries = Object.entries(out).filter(([, v]) => typeof v === "number") as [string, number][];
     if (!entries.length) throw new Error("Empty prediction dict");
@@ -37,7 +38,6 @@ function parseGradioOutput(out: any): { label: string; conf: number } {
     const [label, conf] = entries[0];
     return { label, conf };
   }
-  // C) List of pairs [["Type", 0.87], ...]
   if (Array.isArray(out) && out.length && Array.isArray(out[0])) {
     const entries = [...out].sort((a, b) => b[1] - a[1]) as [string, number][];
     const [label, conf] = entries[0];
@@ -56,7 +56,7 @@ export default function Page() {
   const [desc, setDesc] = useState<string>("");
   const [showResult, setShowResult] = useState(false);
 
-  const cRef = useRef<Client | null>(null);
+  const clientRef = useRef<any | null>(null);
 
   const utm = useMemo(() => {
     if (typeof window === "undefined") return {};
@@ -69,21 +69,19 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    // Preload Space client lazily
+    // Preload Space client (best-effort; will retry on click if it fails)
     (async () => {
       try {
-        cRef.current = await gradioClient(SPACE_ID);
-      } catch {
-        // will retry on click
-      }
+        const client = await loadGradioClient();
+        clientRef.current = await client(SPACE_ID);
+      } catch {}
     })();
   }, []);
 
   useEffect(() => {
-    // Render/refresh Typeform with hidden values
-    if (!window.tf) return;
+    // Render Typeform with hidden fields
     const container = document.getElementById("tf-form");
-    if (!container) return;
+    if (!window.tf || !container) return;
     container.innerHTML = "";
     window.tf.createWidget(TYPEFORM_ID, {
       container,
@@ -105,18 +103,22 @@ export default function Page() {
       if (file.size > MAX_MB * 1024 * 1024) { alert(`Please upload an image under ${MAX_MB} MB.`); return; }
 
       setStatus("Analyzing…");
-      if (!cRef.current) cRef.current = await gradioClient(SPACE_ID);
+      if (!clientRef.current) {
+        const client = await loadGradioClient();
+        clientRef.current = await client(SPACE_ID);
+      }
 
       let res: any;
       try {
-        res = await cRef.current.predict("/predict", [file]);
+        res = await clientRef.current.predict("/predict", [file]);
       } catch {
-        res = await cRef.current.predict(0, [file]);
+        res = await clientRef.current.predict(0, [file]);
       }
+
       const out = res?.data?.[0];
       const { label, conf } = parseGradioOutput(out);
-
       const percentage = Math.round(conf * 100);
+
       setLabel(label);
       setPct(percentage);
       setDesc(DESCRIPTIONS[label] || "");
@@ -131,9 +133,7 @@ export default function Page() {
 
   return (
     <>
-      {/* Typeform embed script */}
       <Script src="https://embed.typeform.com/next/embed.js" strategy="afterInteractive" />
-
       <main style={{ maxWidth: 960, margin: "0 auto", padding: 24, fontFamily: "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial" }}>
         <header style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
           <img src="https://dummyimage.com/160x40/000/fff&text=KeraNova" alt="KeraNova" style={{ height: 32 }} />
@@ -148,11 +148,7 @@ export default function Page() {
           {/* Left card */}
           <div style={{ background: "#f4f6f8", borderRadius: 12, padding: 16 }}>
             <label><strong>1) Upload photo (JPEG/PNG)</strong></label><br />
-            <input
-              type="file"
-              accept="image/jpeg,image/png"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-            />
+            <input type="file" accept="image/jpeg,image/png" onChange={(e) => setFile(e.target.files?.[0] || null)} />
 
             <div style={{ height: 1, background: "#e6e9ec", margin: "16px 0" }} />
 
@@ -183,7 +179,6 @@ export default function Page() {
 
             {showResult && (
               <div style={{ marginTop: 16 }}>
-                {/* Confidence badge removed; show label + % only */}
                 <div style={{ fontSize: 22, fontWeight: 700, margin: "8px 0 4px" }}>
                   {label} — {pct}%
                 </div>
