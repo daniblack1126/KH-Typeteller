@@ -82,8 +82,8 @@
     </div>
   </div>
 
-  <script type="module">
-    import { client } from "https://cdn.jsdelivr.net/npm/@gradio/client/+esm";
+<script type="module">
+  import { client } from "https://cdn.jsdelivr.net/npm/@gradio/client/+esm";
 
     const SPACE_ID = "daniblack1/Hair-Trainer-2025"; 
     const TYPEFORM_ID = "01K4T4CR7PWM5WCCH8KKPW1K5F"; 
@@ -128,44 +128,65 @@
       document.getElementById("typeform-card").style.display = "none";
     });
 
-    analyzeBtn.addEventListener("click", async () => {
+ analyzeBtn.addEventListener("click", async () => {
+    try {
+      statusEl.textContent = "Uploading…";
+      const file = fileEl.files?.[0];
+      if (!file) { alert("Select a JPEG/PNG first."); return; }
+      if (file.size > 8 * 1024 * 1024) { alert("Please upload an image under 8 MB."); return; }
+
+      const c = await client(SPACE_ID);
+      statusEl.textContent = "Analyzing…";
+
+      // Try named endpoint first, then fn_index=0 as fallback
+      let res;
       try {
-        statusEl.textContent = "Uploading…";
-        const file = fileEl.files?.[0];
-        if (!file) { alert("Select a JPEG/PNG first."); return; }
-
-        const c = await client(SPACE_ID);
-        statusEl.textContent = "Analyzing…";
-        const res = await c.predict(0, [file]);
-
-        let label = "", conf = 0;
-        const out = res.data?.[0];
-        if (out && typeof out === "object" && "label" in out) {
-          label = out.label;
-          conf  = (out.confidences?.find(x => x.label === label)?.confidence) ?? 0;
-        } else if (out && typeof out === "object") {
-          const entries = Object.entries(out).sort((a,b)=>b[1]-a[1]);
-          [label, conf] = [entries[0][0], entries[0][1]];
-        } else {
-          throw new Error("Unexpected model output.");
-        }
-
-        const pct = Math.round(conf * 100);
-        labelText.textContent = `${label} — ${pct}%`;
-        descText.textContent  = DESCRIPTIONS[label] || "";
-        confBadge.textContent = `Confidence ${pct}%`;
-        outBox.classList.remove("hidden");
-        statusEl.textContent = "Done.";
-
-        const consent = cstore.checked ? "store_ok" : "no_store";
-        renderTypeform(label, String(pct), consent);
-
-      } catch (err) {
-        console.error(err);
-        statusEl.textContent = "Error. Try again.";
-        alert("Prediction failed. Please try another photo.");
+        res = await c.predict("/predict", [file]);
+      } catch (e) {
+        console.warn("Named endpoint failed; falling back to fn_index=0", e);
+        res = await c.predict(0, [file]);
       }
-    });
-  </script>
+      console.log("Gradio raw result:", res);
+
+      // Normalize output
+      const out = res?.data?.[0];
+      let label = "", conf = 0;
+
+      // Case A: Label object { label, confidences: [{label, confidence}] }
+      if (out && typeof out === "object" && "label" in out && Array.isArray(out.confidences)) {
+        label = out.label;
+        const m = out.confidences.find(x => x.label === label);
+        conf = m ? m.confidence : 0;
+      }
+      // Case B: mapping dict { "Type 1: Straight": 0.87, ... }
+      else if (out && typeof out === "object" && !Array.isArray(out)) {
+        const entries = Object.entries(out).filter(([,v]) => typeof v === "number");
+        if (entries.length === 0) throw new Error("Empty prediction dict");
+        entries.sort((a,b)=>b[1]-a[1]);
+        [label, conf] = [entries[0][0], entries[0][1]];
+      }
+      // Case C: list of pairs [["Type", 0.87], ...]
+      else if (Array.isArray(out) && out.length && Array.isArray(out[0])) {
+        const entries = out.sort((a,b)=>b[1]-a[1]);
+        [label, conf] = [entries[0][0], entries[0][1]];
+      }
+      else {
+        throw new Error("Unexpected model output format");
+      }
+
+      // Update UI
+      const pct = Math.round(conf * 100);
+      labelText.textContent = `${label} — ${pct}%`;
+      descText.textContent  = DESCRIPTIONS[label] || "";
+      confBadge.textContent = `Confidence ${pct}%`;
+      outBox.classList.remove("hidden");
+      statusEl.textContent = "Done.";
+    } catch (err) {
+      console.error("Predict error:", err);
+      statusEl.textContent = "Error. Try again.";
+      alert("Prediction failed. Please try another photo.");
+    }
+  });
+</script>
 </body>
 </html>
