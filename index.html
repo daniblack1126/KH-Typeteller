@@ -22,9 +22,64 @@
     .hidden { display:none; }
     .divider { height:1px; background:#e6e9ec; margin:16px 0; }
     .consent { display:flex; gap:12px; align-items:flex-start; margin:8px 0; }
-    #tf-form { min-height: 500px; }
-    .close-btn { position: absolute; top: 8px; right: 12px; background: transparent; border: none; font-size: 20px; cursor: pointer; color: #555; }
-    .close-btn:hover { color: #000; }
+    
+    /* Enhanced Typeform container responsiveness */
+    #tf-form { 
+      width: 100%; 
+      min-height: 600px; 
+    }
+    @media(min-width:960px) {
+      #tf-form { 
+        min-height: 720px; 
+      }
+    }
+    
+    /* Improved close button accessibility */
+    .close-btn { 
+      position: absolute; 
+      top: 8px; 
+      right: 12px; 
+      background: transparent; 
+      border: none; 
+      font-size: 20px; 
+      cursor: pointer; 
+      color: #555;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+    .close-btn:hover, .close-btn:focus { 
+      color: #000; 
+      background: rgba(0,0,0,0.1);
+      outline: 2px solid var(--brand);
+    }
+    
+    /* Open form button styling */
+    .open-form-btn {
+      background: var(--brand);
+      color: #fff;
+      border: 0;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 8px;
+    }
+    .open-form-btn:hover, .open-form-btn:focus {
+      background: #1a5cd8;
+      outline: 2px solid #0969da;
+    }
+    
+    /* Error message styling */
+    .error-message {
+      color: #d1242f;
+      background: #fff8f8;
+      border: 1px solid #ffdddd;
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin-top: 8px;
+      font-size: 14px;
+    }
   </style>
   <script src="https://embed.typeform.com/next/embed.js" defer></script>
 </head>
@@ -35,7 +90,7 @@
       <h1>Hair Type Teller</h1>
     </header>
 
-    <p class="muted">Upload a clear hair photo. We’ll show the top hair type and confidence, then you can leave your email.</p>
+    <p class="muted">Upload a clear hair photo. We'll show the top hair type and confidence, then you can leave your email.</p>
 
     <div class="row">
       <div class="card">
@@ -60,16 +115,18 @@
         </div>
 
         <div id="out" class="hidden" style="margin-top:16px;">
-          <!-- Removed Confidence badge -->
           <div class="result" id="labelText">—</div>
           <div class="desc" id="descText">—</div>
         </div>
       </div>
 
       <div class="card" id="typeform-card">
-        <button class="close-btn" id="closeTypeform">&times;</button>
+        <!-- Enhanced close button with accessibility -->
+        <button class="close-btn" id="closeTypeform" aria-label="Close email form" role="button">&times;</button>
         <label><strong>Leave your email (optional)</strong></label>
-        <div id="tf-form"></div>
+        <div id="tf-form" role="region" aria-label="Email signup form"></div>
+        <!-- Open form button (initially hidden) -->
+        <button class="open-form-btn hidden" id="openTypeform" aria-label="Open email form">Open Form</button>
       </div>
     </div>
   </div>
@@ -90,6 +147,15 @@
   const fileEl = $("#file"), analyzeBtn = $("#analyze"), statusEl = $("#status");
   const outBox = $("#out"), labelText = $("#labelText"), descText = $("#descText");
   const c13 = $("#c13"), cstore = $("#cstore");
+  
+  const typeformCard = $("#typeform-card");
+  const closeBtn = $("#closeTypeform");
+  const openBtn = $("#openTypeform");
+  const tfContainer = $("#tf-form");
+
+  let currentHiddenFields = {};
+  let typeformVisible = true;
+  let widgetCreationTimeout = null;
 
   function updateButton() {
     analyzeBtn.disabled = !(fileEl.files?.length && c13.checked);
@@ -105,26 +171,127 @@
   };
 
   function renderTypeform(hairType="", confidence="", consent="") {
-    const container = document.getElementById("tf-form");
-    container.innerHTML = "";
-    window.tf?.createWidget(TYPEFORM_ID, {
-      container,
-      hidden: { hairType, confidence, consent, ...UTM },
-      opacity: 100, lazy: false
-    });
+    // Clear any pending widget creation
+    if (widgetCreationTimeout) {
+      clearTimeout(widgetCreationTimeout);
+    }
+    
+    // Update current hidden fields
+    currentHiddenFields = { hairType, confidence, consent, ...UTM };
+    
+    // Only render if Typeform is visible
+    if (!typeformVisible) return;
+    
+    widgetCreationTimeout = setTimeout(() => {
+      const container = document.getElementById("tf-form");
+      if (!container) return;
+      
+      container.innerHTML = "";
+      
+      // Guard window.tf access and retry if not available
+      if (typeof window.tf !== 'undefined' && window.tf.createWidget) {
+        try {
+          window.tf.createWidget(TYPEFORM_ID, {
+            container,
+            hidden: currentHiddenFields,
+            opacity: 100, 
+            lazy: false
+          });
+        } catch (error) {
+          console.warn("Typeform widget creation failed:", error);
+        }
+      } else {
+        // Retry when Typeform library becomes available
+        setTimeout(() => renderTypeform(hairType, confidence, consent), 500);
+      }
+    }, 100); // Debounce widget creation
   }
-  window.addEventListener("load", () => renderTypeform());
 
-  document.getElementById("closeTypeform").addEventListener("click", () => {
-    document.getElementById("typeform-card").style.display = "none";
+  function closeTypeform() {
+    typeformVisible = false;
+    tfContainer.style.display = "none";
+    openBtn.classList.remove("hidden");
+    // Focus management: move focus to open button
+    setTimeout(() => openBtn.focus(), 100);
+  }
+
+  function openTypeform() {
+    typeformVisible = true;
+    tfContainer.style.display = "block";
+    openBtn.classList.add("hidden");
+    // Re-render with current hidden fields
+    renderTypeform(currentHiddenFields.hairType, currentHiddenFields.confidence, currentHiddenFields.consent);
+    // Focus management: move focus to Typeform container
+    setTimeout(() => tfContainer.focus(), 200);
+  }
+
+  closeBtn.addEventListener("click", closeTypeform);
+  closeBtn.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      closeTypeform();
+    }
   });
+
+  openBtn.addEventListener("click", openTypeform);
+  openBtn.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openTypeform();
+    }
+  });
+
+  let typeformInitialized = false;
+  function initializeTypeform() {
+    if (!typeformInitialized && typeformVisible) {
+      typeformInitialized = true;
+      renderTypeform();
+    }
+  }
+
+  window.addEventListener("load", initializeTypeform);
+
+  function showError(message) {
+    // Remove any existing error messages
+    const existingError = document.querySelector('.error-message');
+    if (existingError) {
+      existingError.remove();
+    }
+    
+    // Create and show new error message
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.textContent = message;
+    statusEl.parentNode.insertBefore(errorDiv, statusEl.nextSibling);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+      if (errorDiv.parentNode) {
+        errorDiv.remove();
+      }
+    }, 5000);
+  }
 
   analyzeBtn.addEventListener("click", async () => {
     try {
+      // Clear any existing error messages
+      const existingError = document.querySelector('.error-message');
+      if (existingError) {
+        existingError.remove();
+      }
+      
       statusEl.textContent = "Uploading…";
       const file = fileEl.files?.[0];
-      if (!file) { alert("Select a JPEG/PNG first."); return; }
-      if (file.size > 8 * 1024 * 1024) { alert("Please upload an image under 8 MB."); return; }
+      if (!file) { 
+        showError("Please select a JPEG or PNG file first.");
+        statusEl.textContent = "";
+        return; 
+      }
+      if (file.size > 8 * 1024 * 1024) { 
+        showError("Please upload an image under 8 MB.");
+        statusEl.textContent = "";
+        return; 
+      }
 
       const c = await client(SPACE_ID);
       statusEl.textContent = "Analyzing…";
@@ -158,14 +325,14 @@
       outBox.classList.remove("hidden");
       statusEl.textContent = "Done.";
 
-      // (Optional) re-render Typeform with hidden values
       const consent = cstore.checked ? "store_ok" : "no_store";
+      initializeTypeform();
       renderTypeform(label, String(pct), consent);
 
     } catch (err) {
       console.error("Predict error:", err);
-      statusEl.textContent = "Error. Try again.";
-      alert("Prediction failed. Please try another photo.");
+      statusEl.textContent = "";
+      showError("Prediction failed. Please try another photo or check your internet connection.");
     }
   });
 </script>
