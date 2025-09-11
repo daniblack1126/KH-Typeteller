@@ -20,9 +20,16 @@ const DESCRIPTIONS: Record<string, string> = {
 
 // ---- Load Gradio client at runtime from CDN (avoids webpack bundling issues)
 async function loadGradioClient(): Promise<(space: string) => Promise<any>> {
-  const mod: any = await import("https://cdn.jsdelivr.net/npm/@gradio/client/+esm");
+  // Tell Webpack to NOT bundle this; let the browser import it at runtime.
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  const mod: any = await import(
+    /* webpackIgnore: true */
+    "https://cdn.jsdelivr.net/npm/@gradio/client/+esm"
+  );
   return mod.client;
 }
+
 
 function parseGradioOutput(out: any): { label: string; conf: number } {
   if (out && typeof out === "object" && "label" in out && Array.isArray(out.confidences)) {
