@@ -10,7 +10,7 @@
     .wrap { max-width: 960px; margin: 0 auto; padding: 24px; }
     header { display:flex; align-items:center; gap:12px; margin-bottom: 16px; flex-wrap:wrap; }
     header img { height: 32px; }
-    h1 { margin: 0; font-size: 20px; width: 100%; } /* Force title on new line */
+    h1 { margin: 0; font-size: 20px; width: 100%; }
     .card { background: var(--muted); border-radius: 12px; padding: 16px; position: relative; }
     .row { display:grid; grid-template-columns: 1fr; gap:16px; }
     @media(min-width:960px){ .row{ grid-template-columns: 1.1fr 1fr; } }
@@ -21,16 +21,9 @@
     .desc { font-size:14px; }
     .hidden { display:none; }
     .divider { height:1px; background:#e6e9ec; margin:16px 0; }
-    .badge { display:inline-block; background:#eef3ff; color:#1b3d8f; padding:3px 8px; border-radius:999px; font-size:12px; }
     .consent { display:flex; gap:12px; align-items:flex-start; margin:8px 0; }
-    /* Enlarged typeform */
-    #tf-form { min-height: 500px; }  
-    /* Close button */
-    .close-btn {
-      position: absolute; top: 8px; right: 12px;
-      background: transparent; border: none; font-size: 20px;
-      cursor: pointer; color: #555;
-    }
+    #tf-form { min-height: 500px; }
+    .close-btn { position: absolute; top: 8px; right: 12px; background: transparent; border: none; font-size: 20px; cursor: pointer; color: #555; }
     .close-btn:hover { color: #000; }
   </style>
   <script src="https://embed.typeform.com/next/embed.js" defer></script>
@@ -67,13 +60,12 @@
         </div>
 
         <div id="out" class="hidden" style="margin-top:16px;">
-          <div class="badge" id="confBadge">Confidence</div>
+          <!-- Removed Confidence badge -->
           <div class="result" id="labelText">—</div>
           <div class="desc" id="descText">—</div>
         </div>
       </div>
 
-      <!-- Right: Typeform -->
       <div class="card" id="typeform-card">
         <button class="close-btn" id="closeTypeform">&times;</button>
         <label><strong>Leave your email (optional)</strong></label>
@@ -85,50 +77,49 @@
 <script type="module">
   import { client } from "https://cdn.jsdelivr.net/npm/@gradio/client/+esm";
 
-    const SPACE_ID = "daniblack1/Hair-Trainer-2025"; 
-    const TYPEFORM_ID = "01K4T4CR7PWM5WCCH8KKPW1K5F"; 
-    const DESCRIPTIONS = {
-      "Type 1: Straight": "Smooth strands with minimal bend; can look shiny and may resist curls. Use lightweight wash/conditioner and a weightless volumizer.",
-      "Type 2: Wavy":     "Loose S-shaped pattern; can frizz or fall flat if products are heavy. Use light mousse or texturizing spray.",
-      "Type 3: Curly":    "Defined, springy curls and volume; frizz-prone. Use moisture-rich wash, curl cream + gel; leave-in helps.",
-      "Type 4: Kinky":    "Tight coils/zig-zags; very delicate and dry by nature. Use rich creams/butters and oils; coil-defining styler."
-    };
+  const SPACE_ID = "daniblack1/Hair-Trainer-2025";
+  const TYPEFORM_ID = "01K4T4CR7PWM5WCCH8KKPW1K5F";
+  const DESCRIPTIONS = {
+    "Type 1: Straight": "Smooth strands with minimal bend; can look shiny and may resist curls. Use lightweight wash/conditioner and a weightless volumizer.",
+    "Type 2: Wavy":     "Loose S-shaped pattern; can frizz or fall flat if products are heavy. Use light mousse or texturizing spray.",
+    "Type 3: Curly":    "Defined, springy curls and volume; frizz-prone. Use moisture-rich wash, curl cream + gel; leave-in helps.",
+    "Type 4: Kinky":    "Tight coils/zig-zags; very delicate and dry by nature. Use rich creams/butters and oils; coil-defining styler."
+  };
 
-    const $ = (q)=>document.querySelector(q);
-    const fileEl = $("#file"), analyzeBtn = $("#analyze"), statusEl = $("#status");
-    const outBox = $("#out"), labelText = $("#labelText"), descText = $("#descText"), confBadge = $("#confBadge");
-    const c13 = $("#c13"), cstore = $("#cstore");
+  const $ = (q)=>document.querySelector(q);
+  const fileEl = $("#file"), analyzeBtn = $("#analyze"), statusEl = $("#status");
+  const outBox = $("#out"), labelText = $("#labelText"), descText = $("#descText");
+  const c13 = $("#c13"), cstore = $("#cstore");
 
-    function updateButton() {
-      analyzeBtn.disabled = !(fileEl.files?.length && c13.checked);
-    }
-    fileEl.addEventListener("change", updateButton);
-    c13.addEventListener("change", updateButton);
+  function updateButton() {
+    analyzeBtn.disabled = !(fileEl.files?.length && c13.checked);
+  }
+  fileEl.addEventListener("change", updateButton);
+  c13.addEventListener("change", updateButton);
 
-    const urlParams = new URLSearchParams(location.search);
-    const UTM = {
-      utm_source:  urlParams.get("utm_source")  || "",
-      utm_medium:  urlParams.get("utm_medium")  || "",
-      utm_campaign:urlParams.get("utm_campaign")|| ""
-    };
+  const urlParams = new URLSearchParams(location.search);
+  const UTM = {
+    utm_source:  urlParams.get("utm_source")  || "",
+    utm_medium:  urlParams.get("utm_medium")  || "",
+    utm_campaign:urlParams.get("utm_campaign")|| ""
+  };
 
-    function renderTypeform(hairType="", confidence="", consent="") {
-      const container = document.getElementById("tf-form");
-      container.innerHTML = "";
-      window.tf?.createWidget(TYPEFORM_ID, {
-        container,
-        hidden: { hairType, confidence, consent, ...UTM },
-        opacity: 100, lazy: false
-      });
-    }
-    window.addEventListener("load", () => renderTypeform());
-
-    // Close button for typeform
-    document.getElementById("closeTypeform").addEventListener("click", () => {
-      document.getElementById("typeform-card").style.display = "none";
+  function renderTypeform(hairType="", confidence="", consent="") {
+    const container = document.getElementById("tf-form");
+    container.innerHTML = "";
+    window.tf?.createWidget(TYPEFORM_ID, {
+      container,
+      hidden: { hairType, confidence, consent, ...UTM },
+      opacity: 100, lazy: false
     });
+  }
+  window.addEventListener("load", () => renderTypeform());
 
- analyzeBtn.addEventListener("click", async () => {
+  document.getElementById("closeTypeform").addEventListener("click", () => {
+    document.getElementById("typeform-card").style.display = "none";
+  });
+
+  analyzeBtn.addEventListener("click", async () => {
     try {
       statusEl.textContent = "Uploading…";
       const file = fileEl.files?.[0];
@@ -138,49 +129,39 @@
       const c = await client(SPACE_ID);
       statusEl.textContent = "Analyzing…";
 
-      // Try named endpoint first, then fn_index=0 as fallback
       let res;
-      try {
-        res = await c.predict("/predict", [file]);
-      } catch (e) {
-        console.warn("Named endpoint failed; falling back to fn_index=0", e);
-        res = await c.predict(0, [file]);
-      }
-      console.log("Gradio raw result:", res);
+      try { res = await c.predict("/predict", [file]); }
+      catch { res = await c.predict(0, [file]); }
 
-      // Normalize output
       const out = res?.data?.[0];
       let label = "", conf = 0;
 
-      // Case A: Label object { label, confidences: [{label, confidence}] }
       if (out && typeof out === "object" && "label" in out && Array.isArray(out.confidences)) {
         label = out.label;
         const m = out.confidences.find(x => x.label === label);
         conf = m ? m.confidence : 0;
-      }
-      // Case B: mapping dict { "Type 1: Straight": 0.87, ... }
-      else if (out && typeof out === "object" && !Array.isArray(out)) {
+      } else if (out && typeof out === "object" && !Array.isArray(out)) {
         const entries = Object.entries(out).filter(([,v]) => typeof v === "number");
-        if (entries.length === 0) throw new Error("Empty prediction dict");
+        if (!entries.length) throw new Error("Empty prediction dict");
         entries.sort((a,b)=>b[1]-a[1]);
         [label, conf] = [entries[0][0], entries[0][1]];
-      }
-      // Case C: list of pairs [["Type", 0.87], ...]
-      else if (Array.isArray(out) && out.length && Array.isArray(out[0])) {
+      } else if (Array.isArray(out) && out.length && Array.isArray(out[0])) {
         const entries = out.sort((a,b)=>b[1]-a[1]);
         [label, conf] = [entries[0][0], entries[0][1]];
-      }
-      else {
+      } else {
         throw new Error("Unexpected model output format");
       }
 
-      // Update UI
       const pct = Math.round(conf * 100);
       labelText.textContent = `${label} — ${pct}%`;
       descText.textContent  = DESCRIPTIONS[label] || "";
-      confBadge.textContent = `Confidence ${pct}%`;
       outBox.classList.remove("hidden");
       statusEl.textContent = "Done.";
+
+      // (Optional) re-render Typeform with hidden values
+      const consent = cstore.checked ? "store_ok" : "no_store";
+      renderTypeform(label, String(pct), consent);
+
     } catch (err) {
       console.error("Predict error:", err);
       statusEl.textContent = "Error. Try again.";
