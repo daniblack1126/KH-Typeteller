@@ -1,5 +1,5 @@
 // app/layout.tsx
-import "./app/globals.css";
+import "./app/global.css";
 
 export const metadata = {
   title: "KeraNova Hair – TypeTeller",
